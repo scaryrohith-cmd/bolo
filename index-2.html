@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bolo</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B4FD8">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one narrow column. Language pair on top, chat log in the middle, two mic buttons (You / Other person) pinned to the bottom. */
+:root {
+  --bg: #F2F4F7;
+  --surface: #FFFFFF;
+  --ink: #142033;
+  --muted: #5B6B80;
+  --line: #D8DEE7;
+  --accent: #1B4FD8;
+  --accent-ink: #FFFFFF;
+  --soft: #E8EEFB;
+  --live: #D6372A;
+  --font-display: "Bricolage Grotesque", "Noto Sans", system-ui, sans-serif;
+  --font-body: "Hanken Grotesk", "Noto Sans", "Noto Sans Devanagari", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Bengali", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C1118; --surface: #151D28; --ink: #E7EDF5; --muted: #92A1B5;
+    --line: #26313F; --accent: #7EA2FF; --accent-ink: #0C1118; --soft: #1B2740; --live: #FF6B5C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C1118; --surface: #151D28; --ink: #E7EDF5; --muted: #92A1B5;
+  --line: #26313F; --accent: #7EA2FF; --accent-ink: #0C1118; --soft: #1B2740; --live: #FF6B5C;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 16px/1.5 var(--font-body);
+  padding-block: max(20px, env(safe-area-inset-top, 0px)) 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 210px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font: 800 2rem/1 var(--font-display); letter-spacing: -0.02em; margin: 0; }
+.tag { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.langs { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; }
+.sel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sel span { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+select {
+  width: 100%; min-width: 0; appearance: none; font: 500 1rem var(--font-body); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#swap { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; }
+#swap svg { width: 20px; height: 20px; }
+.notice { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.bar label { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; }
+.bar input { width: 18px; height: 18px; accent-color: var(--accent); }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 5px 12px; font-size: 0.85rem; }
+.ghost:disabled { opacity: 0.4; cursor: default; }
+
+#log { display: flex; flex-direction: column; gap: 10px; min-height: 160px; }
+.empty { margin: 0; padding: 16px; border: 1px dashed var(--line); border-radius: 14px; color: var(--muted); font-size: 0.95rem; }
+.empty b { color: var(--ink); font-weight: 600; }
+.msg { display: flex; flex-direction: column; gap: 4px; max-width: 88%; }
+.msg.me { align-self: flex-end; align-items: flex-end; }
+.msg.them { align-self: flex-start; align-items: flex-start; }
+.who { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.bubble { border-radius: 16px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.me .bubble { background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; }
+.them .bubble { background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.tr { font-size: 1.2rem; line-height: 1.4; }
+.orig { font-size: 0.85rem; opacity: 0.8; }
+.me .orig { opacity: 0.85; }
+.them .orig { color: var(--muted); opacity: 1; }
+.err { font-size: 0.9rem; }
+.row { display: flex; gap: 6px; align-items: center; }
+.small { background: transparent; border: 1px solid currentColor; border-radius: 8px; padding: 2px 10px; font-size: 0.8rem; opacity: 0.85; }
+.live .bubble { background: transparent; border: 1px dashed var(--line); color: var(--muted); font-style: italic; }
+
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 28px max(16px, env(safe-area-inset-left, 0px)) max(14px, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, var(--bg) 66%, transparent);
+  pointer-events: none;
+}
+.dock > * { pointer-events: auto; }
+.mics { width: 100%; max-width: 640px; display: flex; gap: 10px; }
+.mic {
+  flex: 1; min-width: 0; min-height: 68px; border-radius: 20px; display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 8px 12px; text-align: left; position: relative;
+}
+.mic svg { width: 28px; height: 28px; flex: none; }
+.mic .t { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.mic .t b { font-weight: 600; font-size: 1rem; }
+.mic .t small { font-size: 0.82rem; opacity: 0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mic.me { background: var(--accent); color: var(--accent-ink); border: 0; box-shadow: 0 6px 18px rgba(27, 79, 216, 0.25); }
+.mic.them { background: var(--surface); color: var(--ink); border: 2px solid var(--accent); }
+.mic.live { background: var(--live); color: #fff; border: 0; }
+.mic.live::after { content: ""; position: absolute; inset: -5px; border-radius: 24px; border: 3px solid var(--live); animation: pulse 1.4s ease-out infinite; }
+.mic:disabled { opacity: 0.45; cursor: default; }
+@keyframes pulse { from { transform: scale(0.97); opacity: 0.8; } to { transform: scale(1.06); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .mic.live::after { animation: none; opacity: 0.5; } }
+#status { margin: 0; font-size: 0.88rem; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Bolo</h1>
+    <p class="tag">Talk across languages.</p>
+  </header>
+
+  <div class="langs">
+    <label class="sel" for="meLang"><span>You speak</span><select id="meLang"></select></label>
+    <button id="swap" type="button" aria-label="Swap the two languages">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>
+    </button>
+    <label class="sel" for="themLang"><span>Other person speaks</span><select id="themLang"></select></label>
+  </div>
+
+  <div class="notice" id="notice" hidden></div>
+
+  <div class="bar">
+    <label for="autoSpeak"><input type="checkbox" id="autoSpeak" checked> Speak translations aloud</label>
+    <button id="clear" class="ghost" type="button" disabled>Clear chat</button>
+  </div>
+
+  <section id="log" aria-live="polite"></section>
+</main>
+
+<div class="dock">
+  <div class="mics">
+    <button id="micMe" class="mic me" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <span class="t"><b>You</b><small id="meName"></small></span>
+    </button>
+    <button id="micThem" class="mic them" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <span class="t"><b>Other person</b><small id="themName"></small></span>
+    </button>
+  </div>
+  <p id="status">Tap your mic and speak</p>
+</div>
+
+<script>
+const LANGS = [
+  { n: "English",    sr: "en-IN",      t: "en" },
+  { n: "Hindi",      sr: "hi-IN",      t: "hi" },
+  { n: "Tamil",      sr: "ta-IN",      t: "ta" },
+  { n: "Telugu",     sr: "te-IN",      t: "te" },
+  { n: "Kannada",    sr: "kn-IN",      t: "kn" },
+  { n: "Malayalam",  sr: "ml-IN",      t: "ml" },
+  { n: "Bengali",    sr: "bn-IN",      t: "bn" },
+  { n: "Marathi",    sr: "mr-IN",      t: "mr" },
+  { n: "Gujarati",   sr: "gu-IN",      t: "gu" },
+  { n: "Punjabi",    sr: "pa-Guru-IN", t: "pa" },
+  { n: "Urdu",       sr: "ur-IN",      t: "ur" },
+  { n: "Spanish",    sr: "es-ES",      t: "es" },
+  { n: "French",     sr: "fr-FR",      t: "fr" },
+  { n: "German",     sr: "de-DE",      t: "de" },
+  { n: "Portuguese", sr: "pt-BR",      t: "pt" },
+  { n: "Russian",    sr: "ru-RU",      t: "ru" },
+  { n: "Arabic",     sr: "ar-SA",      t: "ar" },
+  { n: "Japanese",   sr: "ja-JP",      t: "ja" },
+  { n: "Korean",     sr: "ko-KR",      t: "ko" },
+  { n: "Chinese",    sr: "zh-CN",      t: "zh-CN" }
+];
+
+const $ = (id) => document.getElementById(id);
+const meSel = $("meLang"), themSel = $("themLang"), logEl = $("log");
+const micBtn = { me: $("micMe"), them: $("micThem") };
+const statusEl = $("status"), notice = $("notice"), autoSpeak = $("autoSpeak");
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+let msgs = [];
+let nextId = 1;
+let active = null;       // "me" | "them" | null
+let rec = null;
+let liveText = "";
+const cache = new Map();
+const builtin = new Map();
+
+LANGS.forEach((l, i) => { meSel.add(new Option(l.n, i)); themSel.add(new Option(l.n, i)); });
+function load(key, fallback) {
+  try { const v = localStorage.getItem(key); if (v !== null && LANGS[+v]) return v; } catch (_) {}
+  return fallback;
+}
+meSel.value = load("bolo.me", "2");
+themSel.value = load("bolo.them", "0");
+try { autoSpeak.checked = localStorage.getItem("bolo.speak") !== "0"; } catch (_) {}
+
+const lang = (who) => LANGS[+(who === "me" ? meSel : themSel).value];
+const other = (who) => (who === "me" ? "them" : "me");
+const whoName = (who) => (who === "me" ? "You" : "Other person");
+function say(msg) { statusEl.textContent = msg; }
+function warn(msg) { notice.hidden = !msg; notice.textContent = msg || ""; }
+function labels() {
+  $("meName").textContent = lang("me").n;
+  $("themName").textContent = lang("them").n;
+}
+function idleStatus() { say("Tap your mic, or the other person's mic, and speak"); }
+
+/* ---------- Translation ---------- */
+function splitText(text) {
+  const sentences = text.split(/(?<=[.!?।۔。！？])\s+/).filter(Boolean);
+  const parts = [];
+  for (const s of sentences) {
+    if (s.length <= 450) { parts.push(s); continue; }
+    let rest = s;
+    while (rest.length > 450) {
+      let cut = rest.lastIndexOf(" ", 450);
+      if (cut < 100) cut = 450;
+      parts.push(rest.slice(0, cut));
+      rest = rest.slice(cut).trim();
+    }
+    if (rest) parts.push(rest);
+  }
+  return parts;
+}
+async function getBuiltin(f, t) {
+  if (!("Translator" in self)) return null;
+  const key = f + ">" + t;
+  if (builtin.has(key)) return builtin.get(key);
+  let tr = null;
+  try {
+    const a = await self.Translator.availability({ sourceLanguage: f, targetLanguage: t });
+    if (a === "available") tr = await self.Translator.create({ sourceLanguage: f, targetLanguage: t });
+  } catch (_) {}
+  builtin.set(key, tr);
+  return tr;
+}
+async function translatePart(p, f, t) {
+  const key = f + "|" + t + "|" + p;
+  if (cache.has(key)) return cache.get(key);
+  let result = null;
+  const local = await getBuiltin(f, t);
+  if (local) { try { result = await local.translate(p); } catch (_) {} }
+  if (result === null) {
+    const url = "https://api.mymemory.translated.net/get?q=" + encodeURIComponent(p) + "&langpair=" + encodeURIComponent(f + "|" + t);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("http " + res.status);
+    const data = await res.json();
+    if (String(data.responseStatus) !== "200") throw new Error("api " + data.responseStatus);
+    result = data.responseData.translatedText;
+  }
+  cache.set(key, result);
+  return result;
+}
+async function translateText(text, f, t) {
+  if (f === t) return text;
+  const done = await Promise.all(splitText(text).map((p) => translatePart(p, f, t)));
+  return done.join(" ");
+}
+
+/* ---------- Speaking the translation aloud ---------- */
+function speak(text, srLang) {
+  if (!text || !("speechSynthesis" in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = srLang;
+    speechSynthesis.speak(u);
+  } catch (_) {}
+}
+
+/* ---------- Chat log ---------- */
+function mk(tag, cls, text) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (text != null) el.textContent = text;
+  return el;
+}
+function render() {
+  logEl.replaceChildren();
+  if (!msgs.length && !active) {
+    const p = mk("p", "empty");
+    p.append(
+      mk("b", null, "How it works. "),
+      document.createTextNode("Tap your mic and say something. Bolo types it, translates it into the other person's language and reads it out. Then the other person taps their mic and answers. Their words are translated back into your language.")
+    );
+    logEl.append(p);
+  }
+  for (const m of msgs) {
+    const wrap = mk("div", "msg " + m.who);
+    wrap.append(mk("div", "who", whoName(m.who) + " · " + m.fromName));
+    const b = mk("div", "bubble");
+    if (m.status === "pending") {
+      b.append(mk("div", "tr", "Translating…"));
+    } else if (m.status === "error") {
+      b.append(mk("div", "err", "Translation failed. Check your internet connection."));
+      const row = mk("div", "row");
+      const retry = mk("button", "small", "Try again");
+      retry.type = "button";
+      retry.addEventListener("click", () => doTranslate(m));
+      row.append(retry);
+      b.append(row);
+    } else {
+      b.append(mk("div", "tr", m.tr));
+      const row = mk("div", "row");
+      const play = mk("button", "small", "Listen");
+      play.type = "button";
+      play.addEventListener("click", () => speak(m.tr, m.toSr));
+      row.append(play);
+      b.append(row);
+    }
+    b.append(mk("div", "orig", m.text));
+    wrap.append(b);
+    logEl.append(wrap);
+  }
+  if (active && liveText) {
+    const wrap = mk("div", "msg live " + active);
+    wrap.append(mk("div", "who", whoName(active) + " · " + lang(active).n));
+    const b = mk("div", "bubble");
+    b.append(mk("div", "tr", liveText));
+    wrap.append(b);
+    logEl.append(wrap);
+  }
+  $("clear").disabled = msgs.length === 0;
+  const last = logEl.lastElementChild;
+  if (last && msgs.length) last.scrollIntoView({ block: "end", behavior: "smooth" });
+}
+
+async function doTranslate(m) {
+  m.status = "pending";
+  render();
+  try {
+    const t = await translateText(m.text, m.fromT, m.toT);
+    m.tr = t;
+    m.status = "done";
+    render();
+    if (autoSpeak.checked) speak(t, m.toSr);
+    warn("");
+  } catch (_) {
+    m.status = "error";
+    render();
+  }
+}
+function commit(who, text) {
+  const f = lang(who), t = lang(other(who));
+  const m = {
+    id: nextId++, who, text,
+    fromName: f.n, fromT: f.t, toT: t.t, toSr: t.sr,
+    tr: "", status: "pending"
+  };
+  msgs.push(m);
+  doTranslate(m);
+}
+
+/* ---------- Listening ---------- */
+function setMics() {
+  for (const who of ["me", "them"]) {
+    const b = micBtn[who];
+    const on = active === who;
+    b.classList.toggle("live", on);
+    b.setAttribute("aria-label", (on ? "Stop listening. " : "Speak as ") + whoName(who) + " in " + lang(who).n);
+  }
+}
+function stopRec(commitIt) {
+  const r = rec;
+  rec = null;
+  if (!r) return;
+  r.onend = null; r.onresult = null; r.onerror = null;
+  try { commitIt ? r.stop() : r.abort(); } catch (_) {}
+}
+function startTurn(who) {
+  if (!SR) return;
+  warn("");
+  try { speechSynthesis.cancel(); } catch (_) {}
+  stopRec(false);
+  const r = new SR();
+  r.lang = lang(who).sr;
+  r.continuous = false;
+  r.interimResults = true;
+  r.maxAlternatives = 1;
+  let finalT = "", interimT = "", finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    if (rec === r) rec = null;
+    const text = (finalT + " " + interimT).replace(/\s+/g, " ").trim();
+    active = null; liveText = "";
+    setMics();
+    if (text) { say("Translating…"); commit(who, text); }
+    render();
+    if (!text) idleStatus();
+    else setTimeout(idleStatus, 1500);
+  };
+  r.onresult = (e) => {
+    let fin = "", live = "";
+    for (let i = 0; i < e.results.length; i++) {
+      const res = e.results[i];
+      if (res.isFinal) fin += res[0].transcript + " "; else live += res[0].transcript;
+    }
+    finalT = fin; interimT = live;
+    liveText = (fin + live).trim();
+    render();
+  };
+  r.onerror = (e) => {
+    if (e.error === "no-speech") { say("Didn't hear anything. Tap the mic and try again."); return; }
+    if (e.error === "aborted") return;
+    const msgsErr = {
+      "not-allowed": "Microphone is blocked. Allow mic access for this page in your browser settings, then try again.",
+      "service-not-allowed": "Speech recognition is turned off on this device or browser.",
+      "audio-capture": "No microphone was found.",
+      "language-not-supported": "This browser can't recognise " + lang(who).n + " speech. Try another language.",
+      "network": "Speech recognition needs an internet connection."
+    };
+    warn(msgsErr[e.error] || "Speech recognition stopped (" + e.error + ").");
+  };
+  r.onend = finish;
+  rec = r;
+  active = who;
+  liveText = "";
+  setMics();
+  say("Listening to " + whoName(who).toLowerCase() + " in " + lang(who).n + ". Tap the mic again to stop.");
+  try { r.start(); } catch (_) { finish(); }
+  render();
+}
+function stopTurn() {
+  if (rec) { try { rec.stop(); } catch (_) {} }
+}
+for (const who of ["me", "them"]) {
+  micBtn[who].addEventListener("click", () => {
+    if (active === who) stopTurn(); else startTurn(who);
+  });
+}
+
+if (!SR) {
+  warn("Voice typing isn't supported in this browser. Open Bolo in Chrome on Android, or Safari on iPhone.");
+  micBtn.me.disabled = true; micBtn.them.disabled = true;
+  say("Voice typing unavailable here");
+}
+
+/* ---------- Controls ---------- */
+function saveLangs() {
+  try { localStorage.setItem("bolo.me", meSel.value); localStorage.setItem("bolo.them", themSel.value); } catch (_) {}
+}
+function onLangChange() {
+  saveLangs(); labels();
+  if (active) { stopRec(false); active = null; liveText = ""; }
+  setMics(); render(); idleStatus();
+  if (cache.size > 400) cache.clear();
+}
+meSel.addEventListener("change", onLangChange);
+themSel.addEventListener("change", onLangChange);
+$("swap").addEventListener("click", () => {
+  const a = meSel.value; meSel.value = themSel.value; themSel.value = a;
+  onLangChange();
+});
+autoSpeak.addEventListener("change", () => {
+  try { localStorage.setItem("bolo.speak", autoSpeak.checked ? "1" : "0"); } catch (_) {}
+  if (!autoSpeak.checked) { try { speechSynthesis.cancel(); } catch (_) {} }
+});
+$("clear").addEventListener("click", () => {
+  msgs = [];
+  try { speechSynthesis.cancel(); } catch (_) {}
+  render();
+});
+
+if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(() => {}); }
+labels();
+setMics();
+render();
+if (SR) idleStatus();
+</script>
+</body>
+</html>
